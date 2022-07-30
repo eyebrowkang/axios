@@ -108,6 +108,180 @@ module.exports = __webpack_require__(/*! ./lib/axios */ "./lib/axios.js");
 
 /***/ }),
 
+/***/ "./lib/adapters/fetch.js":
+/*!*******************************!*\
+  !*** ./lib/adapters/fetch.js ***!
+  \*******************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var utils = __webpack_require__(/*! ./../utils */ "./lib/utils.js");
+var settle = __webpack_require__(/*! ./../core/settle */ "./lib/core/settle.js");
+var cookies = __webpack_require__(/*! ./../helpers/cookies */ "./lib/helpers/cookies.js");
+var buildURL = __webpack_require__(/*! ./../helpers/buildURL */ "./lib/helpers/buildURL.js");
+var isAxiosError = __webpack_require__(/*! ./../helpers/isAxiosError */ "./lib/helpers/isAxiosError.js");
+var buildFullPath = __webpack_require__(/*! ../core/buildFullPath */ "./lib/core/buildFullPath.js");
+var isURLSameOrigin = __webpack_require__(/*! ./../helpers/isURLSameOrigin */ "./lib/helpers/isURLSameOrigin.js");
+var AxiosError = __webpack_require__(/*! ../core/AxiosError */ "./lib/core/AxiosError.js");
+var parseProtocol = __webpack_require__(/*! ../helpers/parseProtocol */ "./lib/helpers/parseProtocol.js");
+
+module.exports = function fetchAdapter(config) {
+  return new Promise(function dispatchFetchRequest(resolve, reject) {
+    var requestData = config.data;
+    var requestHeaders = config.headers;
+    // for Response Object
+    var responseType = config.responseType;
+
+    if (utils.isFormData(requestData) && utils.isStandardBrowserEnv()) {
+      delete requestHeaders['Content-Type']; // Let the browser set it
+    }
+
+    // HTTP basic authentication
+    if (config.auth) {
+      var username = config.auth.username || '';
+      var password = config.auth.password ? unescape(encodeURIComponent(config.auth.password)) : '';
+      requestHeaders.Authorization = 'Basic ' + btoa(username + ':' + password);
+    }
+
+    var fullPath = buildFullPath(config.baseURL, config.url);
+
+    var options = {
+      method: config.method.toUpperCase(),
+    };
+
+    // Add xsrf header
+    // This is only done if running in a standard browser environment.
+    // Specifically not if we're in a web worker, or react-native.
+    if (utils.isStandardBrowserEnv()) {
+      // Add xsrf header
+      var xsrfValue = (config.withCredentials || isURLSameOrigin(fullPath)) && config.xsrfCookieName ?
+        cookies.read(config.xsrfCookieName) :
+        undefined;
+
+      if (xsrfValue) {
+        requestHeaders[config.xsrfHeaderName] = xsrfValue;
+      }
+    }
+
+    // Add headers to the request
+    utils.forEach(requestHeaders, function setRequestHeader(val, key) {
+      if (typeof requestData === 'undefined' && key.toLowerCase() === 'content-type') {
+        // Remove Content-Type if data is undefined
+        delete requestHeaders[key];
+      } else {
+        // Otherwise add header to the request
+        requestHeaders[key] = val;
+      }
+    });
+
+    // Add credentials to options if needed
+    if (!utils.isUndefined(config.credentials)) {
+      options.credentials = !!config.credentials;
+    }
+
+    if (!requestData) {
+      requestData = null;
+    }
+
+    if (config.mode) {
+      options.mode = config.mode;
+    }
+    if (config.cache) {
+      options.cache = config.cache;
+    }
+    if (config.redirect) {
+      options.redirect = config.redirect;
+    }
+    if (config.referrer) {
+      options.referrer = config.referrer;
+    }
+    if (config.referrerPolicy) {
+      options.referrerPolicy = config.referrerPolicy;
+    }
+    if (config.integrity) {
+      options.integrity = config.integrity;
+    }
+    if (config.keepalive) {
+      options.keepalive = config.keepalive;
+    }
+    if (config.signal) {
+      options.signal = config.signal;
+    }
+
+    var protocol = parseProtocol(fullPath);
+
+    if (protocol && [ 'http', 'https', 'file' ].indexOf(protocol) === -1) {
+      reject(new AxiosError('Unsupported protocol ' + protocol + ':', AxiosError.ERR_BAD_REQUEST, config));
+      return;
+    }
+
+    var resource = buildURL(fullPath, config.params, config.paramsSerializer);
+    options.headers = requestHeaders;
+    options.body = requestData;
+
+    var res = {
+      data: '',
+      status: '',
+      statusText: '',
+      headers: '',
+      config: config,
+    }
+    console.log('resource', resource);
+    console.log('options', options);
+    var requestPromise = [fetch(resource, options)];
+    if (config.timeout) {
+      requestPromise.push(new Promise((resolve, reject) => {
+        setTimeout(() => {
+          reject(new AxiosError('Timeout of ' + config.timeout + 'ms exceeded', AxiosError.ERR_TIMEOUT, config));
+        }, config.timeout);
+      }));
+    }
+    Promise.race(requestPromise).then(function (response) {
+      console.log('response object: ', response);
+      res.status = response.status;
+      res.statusText = response.statusText;
+      res.headers = response.headers;
+      if (!responseType || responseType === 'json') {
+        return response.json();
+      } else if (responseType === 'text') {
+        return response.text();
+      } else if (responseType === 'arraybuffer') {
+        return response.arrayBuffer();
+      } else if (responseType === 'blob') {
+        return response.blob();
+      } else if (responseType === 'formdata') {
+        return response.formData();
+      } else {
+        return response;
+      }
+    }).then((data) => {
+      res.data = data;
+      console.log('data: ', data);
+      console.log('res: ', res);
+      settle(function _resolve(value) {
+        resolve(value);
+      }, function _reject(err) {
+        reject(err);
+      }, res);
+    }).catch(function (error) {
+      console.log('error: ', error);
+      if (error.name === 'AbortError') {
+        reject(new AxiosError('Request aborted', AxiosError.ECONNABORTED, config, requestPromise));
+      } else if (isAxiosError(error)) {
+        reject(error);
+      } else {
+        reject(new AxiosError('Network Error', AxiosError.ERR_NETWORK, config, requestPromise));
+      }
+    });
+  });
+};
+
+
+/***/ }),
+
 /***/ "./lib/adapters/xhr.js":
 /*!*****************************!*\
   !*** ./lib/adapters/xhr.js ***!
@@ -1278,7 +1452,11 @@ function setContentTypeIfUnset(headers, value) {
 
 function getDefaultAdapter() {
   var adapter;
-  if (typeof XMLHttpRequest !== 'undefined') {
+  if (typeof fetch !== 'undefined') {
+    // use fetch adapter if available
+    console.log('---Using fetch adapter---');
+    adapter = __webpack_require__(/*! ../adapters/fetch */ "./lib/adapters/fetch.js");
+  } else if (typeof XMLHttpRequest !== 'undefined') {
     // For browsers use XHR adapter
     adapter = __webpack_require__(/*! ../adapters/xhr */ "./lib/adapters/xhr.js");
   } else if (typeof process !== 'undefined' && Object.prototype.toString.call(process) === '[object process]') {

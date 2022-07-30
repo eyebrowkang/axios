@@ -1,0 +1,280 @@
+6a7
+> var isAxiosError = require('./../helpers/isAxiosError');
+8d8
+< var parseHeaders = require('./../helpers/parseHeaders');
+10d9
+< var transitionalDefaults = require('../defaults/transitional');
+12d10
+< var CanceledError = require('../cancel/CanceledError');
+15,16c13,14
+< module.exports = function xhrAdapter(config) {
+<   return new Promise(function dispatchXhrRequest(resolve, reject) {
+---
+> module.exports = function fetchAdapter(config) {
+>   return new Promise(function dispatchFetchRequest(resolve, reject) {
+18a17
+>     // for Response Object
+20,29d18
+<     var onCanceled;
+<     function done() {
+<       if (config.cancelToken) {
+<         config.cancelToken.unsubscribe(onCanceled);
+<       }
+< 
+<       if (config.signal) {
+<         config.signal.removeEventListener('abort', onCanceled);
+<       }
+<     }
+35,36d23
+<     var request = new XMLHttpRequest();
+< 
+46,139c33,34
+<     request.open(config.method.toUpperCase(), buildURL(fullPath, config.params, config.paramsSerializer), true);
+< 
+<     // Set the request timeout in MS
+<     request.timeout = config.timeout;
+< 
+<     function onloadend() {
+<       if (!request) {
+<         return;
+<       }
+<       // Prepare the response
+<       var responseHeaders = 'getAllResponseHeaders' in request ? parseHeaders(request.getAllResponseHeaders()) : null;
+<       var responseData = !responseType || responseType === 'text' ||  responseType === 'json' ?
+<         request.responseText : request.response;
+<       var response = {
+<         data: responseData,
+<         status: request.status,
+<         statusText: request.statusText,
+<         headers: responseHeaders,
+<         config: config,
+<         request: request
+<       };
+< 
+<       settle(function _resolve(value) {
+<         resolve(value);
+<         done();
+<       }, function _reject(err) {
+<         reject(err);
+<         done();
+<       }, response);
+< 
+<       // Clean up request
+<       request = null;
+<     }
+< 
+<     if ('onloadend' in request) {
+<       // Use onloadend if available
+<       request.onloadend = onloadend;
+<     } else {
+<       // Listen for ready state to emulate onloadend
+<       request.onreadystatechange = function handleLoad() {
+<         if (!request || request.readyState !== 4) {
+<           return;
+<         }
+< 
+<         // The request errored out and we didn't get a response, this will be
+<         // handled by onerror instead
+<         // With one exception: request that using file: protocol, most browsers
+<         // will return status as 0 even though it's a successful request
+<         if (request.status === 0 && !(request.responseURL && request.responseURL.indexOf('file:') === 0)) {
+<           return;
+<         }
+<         // readystate handler is calling before onerror or ontimeout handlers,
+<         // so we should call onloadend on the next 'tick'
+<         setTimeout(onloadend);
+<       };
+<     }
+< 
+<     // Handle browser request cancellation (as opposed to a manual cancellation)
+<     request.onabort = function handleAbort() {
+<       if (!request) {
+<         return;
+<       }
+< 
+<       reject(new AxiosError('Request aborted', AxiosError.ECONNABORTED, config, request));
+< 
+<       // Clean up request
+<       request = null;
+<     };
+< 
+<     // Handle low level network errors
+<     request.onerror = function handleError() {
+<       // Real errors are hidden from us by the browser
+<       // onerror should only fire if it's a network error
+<       reject(new AxiosError('Network Error', AxiosError.ERR_NETWORK, config, request, request));
+< 
+<       // Clean up request
+<       request = null;
+<     };
+< 
+<     // Handle timeout
+<     request.ontimeout = function handleTimeout() {
+<       var timeoutErrorMessage = config.timeout ? 'timeout of ' + config.timeout + 'ms exceeded' : 'timeout exceeded';
+<       var transitional = config.transitional || transitionalDefaults;
+<       if (config.timeoutErrorMessage) {
+<         timeoutErrorMessage = config.timeoutErrorMessage;
+<       }
+<       reject(new AxiosError(
+<         timeoutErrorMessage,
+<         transitional.clarifyTimeoutError ? AxiosError.ETIMEDOUT : AxiosError.ECONNABORTED,
+<         config,
+<         request));
+< 
+<       // Clean up request
+<       request = null;
+---
+>     var options = {
+>       method: config.method.toUpperCase(),
+157,204c52,64
+<     if ('setRequestHeader' in request) {
+<       utils.forEach(requestHeaders, function setRequestHeader(val, key) {
+<         if (typeof requestData === 'undefined' && key.toLowerCase() === 'content-type') {
+<           // Remove Content-Type if data is undefined
+<           delete requestHeaders[key];
+<         } else {
+<           // Otherwise add header to the request
+<           request.setRequestHeader(key, val);
+<         }
+<       });
+<     }
+< 
+<     // Add withCredentials to request if needed
+<     if (!utils.isUndefined(config.withCredentials)) {
+<       request.withCredentials = !!config.withCredentials;
+<     }
+< 
+<     // Add responseType to request if needed
+<     if (responseType && responseType !== 'json') {
+<       request.responseType = config.responseType;
+<     }
+< 
+<     // Handle progress if needed
+<     if (typeof config.onDownloadProgress === 'function') {
+<       request.addEventListener('progress', config.onDownloadProgress);
+<     }
+< 
+<     // Not all browsers support upload events
+<     if (typeof config.onUploadProgress === 'function' && request.upload) {
+<       request.upload.addEventListener('progress', config.onUploadProgress);
+<     }
+< 
+<     if (config.cancelToken || config.signal) {
+<       // Handle cancellation
+<       // eslint-disable-next-line func-names
+<       onCanceled = function(cancel) {
+<         if (!request) {
+<           return;
+<         }
+<         reject(!cancel || (cancel && cancel.type) ? new CanceledError() : cancel);
+<         request.abort();
+<         request = null;
+<       };
+< 
+<       config.cancelToken && config.cancelToken.subscribe(onCanceled);
+<       if (config.signal) {
+<         config.signal.aborted ? onCanceled() : config.signal.addEventListener('abort', onCanceled);
+<       }
+---
+>     utils.forEach(requestHeaders, function setRequestHeader(val, key) {
+>       if (typeof requestData === 'undefined' && key.toLowerCase() === 'content-type') {
+>         // Remove Content-Type if data is undefined
+>         delete requestHeaders[key];
+>       } else {
+>         // Otherwise add header to the request
+>         requestHeaders[key] = val;
+>       }
+>     });
+> 
+>     // Add credentials to options if needed
+>     if (!utils.isUndefined(config.credentials)) {
+>       options.credentials = !!config.credentials;
+210a71,95
+>     if (config.mode) {
+>       options.mode = config.mode;
+>     }
+>     if (config.cache) {
+>       options.cache = config.cache;
+>     }
+>     if (config.redirect) {
+>       options.redirect = config.redirect;
+>     }
+>     if (config.referrer) {
+>       options.referrer = config.referrer;
+>     }
+>     if (config.referrerPolicy) {
+>       options.referrerPolicy = config.referrerPolicy;
+>     }
+>     if (config.integrity) {
+>       options.integrity = config.integrity;
+>     }
+>     if (config.keepalive) {
+>       options.keepalive = config.keepalive;
+>     }
+>     if (config.signal) {
+>       options.signal = config.signal;
+>     }
+> 
+218,220c103,160
+< 
+<     // Send the request
+<     request.send(requestData);
+---
+>     var resource = buildURL(fullPath, config.params, config.paramsSerializer);
+>     options.headers = requestHeaders;
+>     options.body = requestData;
+> 
+>     var res = {
+>       data: '',
+>       status: '',
+>       statusText: '',
+>       headers: '',
+>       config: config,
+>     }
+>     console.log('resource', resource);
+>     console.log('options', options);
+>     var requestPromise = [fetch(resource, options)];
+>     if (config.timeout) {
+>       requestPromise.push(new Promise((resolve, reject) => {
+>         setTimeout(() => {
+>           reject(new AxiosError('Timeout of ' + config.timeout + 'ms exceeded', AxiosError.ERR_TIMEOUT, config));
+>         }, config.timeout);
+>       }));
+>     }
+>     Promise.race(requestPromise).then(function (response) {
+>       console.log('response object: ', response);
+>       res.status = response.status;
+>       res.statusText = response.statusText;
+>       res.headers = response.headers;
+>       if (!responseType || responseType === 'json') {
+>         return response.json();
+>       } else if (responseType === 'text') {
+>         return response.text();
+>       } else if (responseType === 'arraybuffer') {
+>         return response.arrayBuffer();
+>       } else if (responseType === 'blob') {
+>         return response.blob();
+>       } else if (responseType === 'formdata') {
+>         return response.formData();
+>       } else {
+>         return response;
+>       }
+>     }).then((data) => {
+>       res.data = data;
+>       console.log('data: ', data);
+>       console.log('res: ', res);
+>       settle(function _resolve(value) {
+>         resolve(value);
+>       }, function _reject(err) {
+>         reject(err);
+>       }, res);
+>     }).catch(function (error) {
+>       console.log('error: ', error);
+>       if (error.name === 'AbortError') {
+>         reject(new AxiosError('Request aborted', AxiosError.ECONNABORTED, config, requestPromise));
+>       } else if (isAxiosError(error)) {
+>         reject(error);
+>       } else {
+>         reject(new AxiosError('Network Error', AxiosError.ERR_NETWORK, config, requestPromise));
+>       }
+>     });

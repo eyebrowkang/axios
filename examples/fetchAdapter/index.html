@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Axios Fetch</title>
+</head>
+<body>
+  <h1>Axios Fetch</h1>
+  <div>
+    <button id="btn">Get Data</button>
+    <button id="clear">clear</button>
+    <div id="content"></div>
+  </div>
+<!--  <script src="https://unpkg.com/axios/dist/axios.min.js"></script>-->
+  <script src="/dist/axios.min.js"></script>
+  <script>
+    const getData = () => {
+      return new Promise((resolve, reject) => {
+        axios.request({
+          method: "get",
+          baseURL: "https://random-data-api.com/api/",
+          url: "/address/random_address",
+        }).then((response) => {
+          resolve(response.data);
+        }).catch((error) => {
+          reject(error);
+        });
+      });
+    };
+
+    const btn = document.getElementById("btn");
+    const content = document.getElementById("content");
+    const clear = document.getElementById("clear");
+
+    btn.addEventListener("click", () => {
+      getData().then((data) => {
+        content.innerHTML = JSON.stringify(data);
+      }).catch((error) => {
+        content.innerHTML = JSON.stringify(error);
+      });
+    });
+
+    clear.addEventListener("click", () => {
+      content.innerHTML = "";
+    });
+  </script>
+</body>
+</html>

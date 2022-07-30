@@ -15,6 +15,24 @@ Promise based HTTP client for the browser and node.js
 
 > New axios docs website: [click here](https://axios-http.com/)
 
+
+
+## Attention
+
+本仓库基于axios原仓库的`bc733fec78326609e751187c9d453cee9bf1993a`提交，对应`v0.27.2`，在此基础上对adapter进行了增加，仅供学习使用，请勿直接用于生产环境。
+
+更改的主要文件如下：
+```shell
+lib
+├── adapters
+│  ├── diff.log # fetch.js和adapter.js的diff
+│  ├── fetch.js # fetch.js adapter
+└── defaults
+   └── index.js
+
+```
+另外还新增了`examples/fetchAdapter/index.html`文件，用于调试。
+
 ## Table of Contents
 
   - [Features](#features)
